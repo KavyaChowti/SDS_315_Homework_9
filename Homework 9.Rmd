@@ -1,0 +1,336 @@
+---
+title: "Homework 9"
+author: "Kavya Chowti - kc45736"
+date: "2024-04-16"
+output: html_document
+---
+
+```{r global options,  echo=FALSE}
+knitr::opts_chunk$set(fig.height=4, fig.width=7, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=60))
+```
+
+[Hyperlink to Github Repository]()
+
+***
+
+# **Question 1**
+
+```{r echo=FALSE, results='hide', message=FALSE}
+
+# load the data set
+
+turnout = read.csv("turnout.csv")
+attach(turnout)
+
+```
+
+#### **PART A**
+
+```{r echo=FALSE, message=FALSE, results='hide'}
+
+# load the dplyr library
+library(dplyr)
+
+# Calculate proportions for GOTV call recipients and non-recipients
+prop_gotv <- turnout %>%
+  filter(GOTV_call == 1) %>%
+  summarize(prop_voted = mean(voted1998)) %>%
+  pull(prop_voted)
+
+prop_nogotv <- turnout %>%
+  filter(GOTV_call == 0) %>%
+  summarize(prop_voted = mean(voted1998)) %>%
+  pull(prop_voted)
+
+# Sample sizes
+n_gotv <- sum(turnout$GOTV_call == 1)
+n_nogotv <- sum(turnout$GOTV_call == 0)
+
+# Calculate the standard error for the difference in proportions
+se_diff <- sqrt(prop_gotv*(1 - prop_gotv)/n_gotv + prop_nogotv*(1 - prop_nogotv)/n_nogotv)
+
+# Calculate the confidence interval
+conf_interval <- c(prop_gotv - prop_nogotv - 1.96 * se_diff,
+                  prop_gotv - prop_nogotv + 1.96 * se_diff)
+
+
+# Calculate the lower and upper bounds of the confidence interval for the relative increase
+lower_bound_rel_inc <- (conf_interval[1] / prop_nogotv) * 100
+upper_bound_rel_inc <- (conf_interval[2] / prop_nogotv) * 100
+
+```
+**Proportion voted in 1998 (GOTV Call):** `r prop_gotv`
+
+**Proportion voted in 1998 (No GOTV Call):** `r prop_nogotv`
+
+**95% Confidence Interval:** (`r conf_interval`)
+
+Based on the initial confidence interval calculated, of the people that voted in 1998, we are 95% confident that about 14.3% to 26.4% more were people that had received the GOTV call. Compared to the people that didn't receive the call and voted, the people that received the call were around 32% to 59% more likely to vote in 1998. 
+
+
+#### **PART B**
+
+
+##### **AGE**
+```{r echo=FALSE, message=FALSE}
+
+library(ggplot2)
+library(kableExtra)
+
+# Filter for those who voted in 1998
+voted_1998_data <- turnout %>%
+  filter(voted1998 == 1)
+
+
+# Boxplot for AGE by GOTV_call
+ggplot(voted_1998_data, aes(y = factor(GOTV_call), x = AGE)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(title = "Age by GOTV Call",
+       y = "GOTV Call",
+       x = "Age") +
+  theme_minimal()
+
+
+# Calculate the five-number summary for AGE by GOTV Call
+summary_stats <- voted_1998_data %>%
+  group_by(GOTV_call) %>%
+  summarize(Minimum = min(AGE),
+            Q1 = quantile(AGE, 0.25),
+            Median = median(AGE),
+            Q3 = quantile(AGE, 0.75),
+            Maximum = max(AGE))
+
+cat("\n")
+
+summary_stats %>%
+  kbl() %>%
+  kable_styling()
+
+```
+
+First, when we look at the comparative box plots for age for those who received the GOTV call and voted in 1998 and those who didn't and voted in 1998 we can see that there is a difference in the ages of the groups. Those who received the call tended to be older. Based on the 5 number summary, we can see that the median age for those didn't receive the call was 53 while the median age for those who did was 66. Although the minimum and maximum ages were similar, overall the ages for those who received the call tended to be skewed higher than those who didn't receive the call showing that there seems to be an association between age and the GOTV_call variable. 
+
+
+##### **MAJOR PARTY**
+
+```{r echo=FALSE, message=FALSE}
+
+# Load required library
+library(knitr)
+
+# Bar plot for MAJORPTY
+
+# Custom color palette for shades of light blue
+custom_palette <- c("lightblue", "lightblue4")
+
+# Bar plot for MAJORPTY with custom fill colors
+ggplot(voted_1998_data, aes(x = factor(GOTV_call), fill = factor(MAJORPTY))) +
+  geom_bar(position = "dodge") +
+  scale_fill_manual(values = custom_palette) +
+  labs(title = "MAJORPTY by GOTV Call",
+       x = "GOTV Call",
+       y = "Count") +
+  theme_minimal()
+
+
+
+# Create a table of counts for MAJORPTY by GOTV_call
+table_majorpty <- xtabs(~ MAJORPTY + GOTV_call, data = voted_1998_data)
+
+# Calculate proportions for each combination of variables
+prop_table_majorpty <- prop.table(table_majorpty, margin = 2)
+
+# Create the data frame manually
+prop_table_majorpty_df <- data.frame(
+  "No GOTV Call" = prop_table_majorpty[, 1],
+  "GOTV Call" = prop_table_majorpty[, 2]
+)
+
+# Add row names
+row_labels <- c("Not Major Party", "Major Party")
+rownames(prop_table_majorpty_df) <- row_labels
+
+# Print the table with kable styling and labeled row names
+kable(prop_table_majorpty_df, format = "markdown",
+      col.names = c("No GOTV Call", "GOTV Call"),
+      caption = "Table of Proportions for MAJORPTY by GOTV_call") %>%
+  kable_styling(full_width = FALSE)
+
+
+```
+
+Based, on the bar plot and the table we can see that whether the person was in a major party is a confounder as well. Of the people that received the GOTV call and voted in 1998, about 83% were from a major party compared to the approximately 17% that were not. The significantly higher proportion of "Major Party" members among those who received a GOTV call (83.13%) compared to those who were not "Major Party" (16.87%) suggests an association between MAJORPTY and GOTV_call. This difference in proportions provides evidence that MAJORPTY is a confounder for the GOTV_call variable.
+
+##### **VOTED IN 1996**
+
+```{r echo=FALSE, message=FALSE, results='hide'}
+
+# T-test for voted1996 by GOTV_call
+ttest_voted1996 <- t.test(voted_1998_data$voted1996[voted_1998_data$GOTV_call == 1],
+                          voted_1998_data$voted1996[voted_1998_data$GOTV_call == 0])
+
+# Print the t-test results
+print(ttest_voted1996)
+
+
+```
+
+**T-Score:** 3.4036
+
+**P-Value:** 0.000824
+
+In conclusion, the results of the t-test provide relatively strong evidence that voting in the 1996 election is associated with both receiving a GOTV call and voting in the 1998 election. This suggests that voting in 1996 is a confounder in the relationship between receiving a GOTV call and voting in the 1998 election.
+
+
+#### **PART C**
+
+```{r echo=FALSE, message=FALSE}
+
+# loading the MatchIt library
+library(MatchIt)
+
+# Create a matching object
+m.out <- matchit(GOTV_call ~ voted1996 + AGE + MAJORPTY, data = turnout, method = "nearest", ratio = 5)
+
+# Create matched dataset
+matched_data <- match.data(m.out)
+
+# Calculate proportions for matched dataset
+prop_gotv_matched <- matched_data %>%
+  filter(GOTV_call == 1) %>%
+  summarize(prop_voted = mean(voted1998)) %>%
+  pull(prop_voted)
+
+prop_nogotv_matched <- matched_data %>%
+  filter(GOTV_call == 0) %>%
+  summarize(prop_voted = mean(voted1998)) %>%
+  pull(prop_voted)
+
+# Sample sizes for matched dataset
+n_gotv_matched <- sum(matched_data$GOTV_call == 1)
+n_nogotv_matched <- sum(matched_data$GOTV_call == 0)
+
+# Calculate the standard error for the difference in proportions
+se_diff_matched <- sqrt(prop_gotv_matched*(1 - prop_gotv_matched)/n_gotv_matched +
+                        prop_nogotv_matched*(1 - prop_nogotv_matched)/n_nogotv_matched)
+
+# Calculate the confidence interval
+conf_interval_matched <- c(prop_gotv_matched - prop_nogotv_matched - 1.96 * se_diff_matched,
+                           prop_gotv_matched - prop_nogotv_matched + 1.96 * se_diff_matched)
+
+
+# Calculate the lower and upper bounds of the confidence interval for the relative increase
+lower_bound_rel_inc_matched <- (conf_interval_matched[1] / prop_nogotv_matched) * 100
+upper_bound_rel_inc_matched <- (conf_interval_matched[2] / prop_nogotv_matched) * 100
+
+```
+
+**Proportion voted in 1998 (GOTV Call, Matched):** `r prop_gotv_matched`
+
+**Proportion voted in 1998 (No GOTV Call, Matched):** `r prop_nogotv_matched`
+
+**95% Confidence Interval (Matched):** (`r conf_interval_matched`)
+
+Based on the confidence interval calculated after making a new data set where we used the GOTV_call as our treatment variable and the 3 confounding variables as our matching variables, of the people that voted in 1998, we are  95% confident that now only about 0.8% to 13.9% more were people that had received the GOTV call. Compared to the people that didn't receive the call and voted, the people that received the call were actually around 1.4% to 24% more likely to vote in 1998. Overall, while people that received the GOTV call were still more likely to vote in the 1998 election based on our confidence interval, the difference is not nearly as drastic as we originally thought.  
+
+# **Question 2**
+
+```{r echo=FALSE, results='hide', message=FALSE}
+
+solder = read.csv("solder.csv")
+attach(solder)
+
+```
+
+
+#### **PART A**
+
+```{r echo=FALSE, message=FALSE}
+
+# Load required libraries
+library(ggplot2)
+
+# Create a plot showing the relationship between Opening Size and Skips
+ggplot(data = solder, aes(x = Opening, y = skips)) +
+  geom_boxplot(fill = "lightblue2") +
+  labs(title = "Relationship between Opening Size and Skips",
+       x = "Opening Size on Solder Gun",
+       y = "Number of Skips") + theme_minimal() + coord_flip()
+
+
+```
+
+The comparative box plot shown above shows the distribution of the number of skips (manufacturing flaws) for each of the three different sizes of openings on the solder gun. From the plot we can clearly see that the small openings have a right skewed distribution with many outliers on the upper end compared to the other sizes. This suggests that more of the circuit boards with small openings seem to be associated with a higher number of skips. Next, the medium sized openings seem to have the next highest number of skips for circuit boards as its distribution has a higher maximum and median than large openings but smaller than the small openings. Lastly, the large openings distribution seems to have the circuits with lower numbers of skips. Overall, the boxplot shows that as the size of the openings goes up, generally, the number of skips goes down.
+
+```{r echo=FALSE, message=FALSE}
+
+# Create a plot showing the relationship between Solder Thickness and Skips
+ggplot(data = solder, aes(x = Solder, y = skips)) +
+  geom_boxplot(fill = "lightblue3") +
+  labs(title = "Relationship between Solder Thickness and Skips",
+       x = "Solder Thickness",
+       y = "Number of Skips") + theme_minimal() + coord_flip()
+
+
+```
+
+Both the distributions for the thickness of the alloys are right skewed however, for the thin alloys the median is higher and the distribution is more right skewed with higher outliers for the number of skips. The plot suggests that the thinner alloys are associated with more of the circuit boards that have a higher number of skips (manufacturing flaws) compared to the thick alloys.
+
+#### **PART B**
+
+```{r echo=FALSE, message=FALSE}
+
+# Fit a regression model with Opening, Solder, and their interaction
+solder.lm <- lm(skips ~ Opening + Solder + Opening:Solder, data = solder)
+coefs = coef(solder.lm)
+
+# Create a table of coefficients with 95% confidence intervals
+confints = confint(solder.lm, level = 0.95) %>% round(3)
+
+
+# Coefficients and Confidence Intervals
+coefficients <- c(0.3933, 2.4067, 5.1267, 2.2800, -0.7400, 9.6533)
+lower_ci <- c(-0.628, 0.962, 3.682, 0.836, -2.782, 7.611)
+upper_ci <- c(1.415, 3.851, 6.571, 3.724, 1.302, 11.696)
+
+# Create the data frame for the table
+coef_table <- data.frame(
+  Coefficient = c("(Intercept)", "OpeningM", "OpeningS", "SolderThin", "OpeningM:SolderThin", "OpeningS:SolderThin"),
+  Estimate = coefficients,
+  `95% CI Lower` = lower_ci,
+  `95% CI Upper` = upper_ci
+)
+
+
+# Print the table with kable styling
+kable(coef_table, format = "markdown",
+      col.names = c("Coefficient", "Estimate", "95% CI Lower", "95% CI Upper"),
+      caption = "Table of Coefficients with 95% Confidence Intervals") %>%
+  kable_styling(full_width = FALSE)
+
+
+```
+
+
+#### **PART C**
+
+**(Intercept) (0.3933):** The baseline number of skips when the opening size is "Small" and solder thickness is "Thin" is 0.3933.
+
+**OpeningM (2.4067):** The main effect of the OpeningM (Medium Opening) variable is 2.4067. This represents the average change in the number of skips when the opening size is "Medium" compared to when it is "Small," holding other variables constant.
+
+**OpeningS (5.1267):** The main effect of the OpeningS (Large Opening) variable is 5.1267. This represents the average change in the number of skips when the opening size is "Large" compared to when it is "Small," holding other variables constant.
+
+**SolderThin (2.2800):** The main effect of the SolderThin variable is 2.2800. This represents the average change in the number of skips when the solder thickness is "Thin" compared to when it is "Thick," holding other variables constant.
+
+**OpeningM:SolderThin (-0.7400):** The interaction effect between OpeningM and SolderThin is -0.7400. This represents the additional change in the number of skips when both the opening size is "Medium" and the solder thickness is "Thin" at the same time, beyond the effects of OpeningM and SolderThin individually.
+
+**OpeningS:SolderThin (9.6533):** The interaction effect between OpeningS and SolderThin is 9.6533. This represents the additional change in the number of skips when both the opening size is "Large" and the solder thickness is "Thin" at the same time, beyond the effects of OpeningS and SolderThin individually.
+
+
+#### **PART D**
+
+To recommend a combination of Opening size and Solder thickness to AT&T based on the analysis, I will consider the coefficients and their confidence intervals from the solder model specifically focusing on the interaction terms, as they represent the combined effect of both variables on the outcome. Considering the goal of minimizing the number of skips in the manufacturing process, the recommendation would be to use the combination of "Medium" opening size and "Thin" solder thickness. This recommendation is based on the estimated decrease of -0.74 in skips, even though it is small, along with the narrower confidence interval. While the combination of "Large" opening size and "Thin" solder thickness shows a larger increase in skips of 9.6533, the wider confidence interval also indicates more uncertainty in this estimate. Therefore, the "Medium" opening size with "Thin" solder thickness combination appears to be a more stable choice for potentially reducing the number of skips in the manufacturing process.
+
+
+
+
